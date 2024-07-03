@@ -361,3 +361,10 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/vendor/imgui/docs
+/vendor/imgui/examples
+/vendor/imgui/misc/fonts
+/vendor/imgui/misc/freetype
+/vendor/imgui/misc/single_file
+/vendor/imgui/misc/debuggers
+/vendor/imgui/backends/vulkan
