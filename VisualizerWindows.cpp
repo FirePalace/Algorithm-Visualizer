@@ -7,6 +7,15 @@
 namespace visualizerWindows 
 { 
     std::vector<int> randomNumberVector;
+    int a = 0;
+    int b = 0;
+    std::string sort;
+
+    void ResetViewport(std::string sortType) {
+        sort = sortType;
+        a = 0;
+        b = 0;
+    }
 
     void PopulateVectorWithRandomNumbers() {
         std::random_device randomNumbers;
@@ -24,15 +33,36 @@ namespace visualizerWindows
         }
         
     }
+    void ExecuteBubbleSort() {
+              
+        if (randomNumberVector[a] > randomNumberVector[b]) {
+            std::swap(randomNumberVector[a], randomNumberVector[b]);
+        }
+        
+        if (b != randomNumberVector.size() -1 ){
+            b++;
+        }
+        else {
+            b = 0;
+            if (a != randomNumberVector.size() - 1) {
+                a++;
+            }
+            else {
+                sort = "";
+            }
+        }
+    }
     
 	void RenderUI() {
        
+        
+
         if (randomNumberVector.empty()) {
             PopulateVectorWithRandomNumbers();
         }
        
         ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
-        //Choose an Alogrithm Window
+        //Choose an Algorithm Window
         {
             
                          
@@ -45,6 +75,7 @@ namespace visualizerWindows
             {
                 
                 PopulateVectorWithRandomNumbers();
+                ResetViewport("Bubble");
                 clicked = 0;
             }
             ImGui::End();
@@ -75,6 +106,9 @@ namespace visualizerWindows
             ImGui::GetWindowSize();
             float y = p.y + ImGui::GetWindowSize().y -26;
             
+            if (sort == "Bubble") {
+                ExecuteBubbleSort();
+            }
              
             for (int i = 0; i < randomNumberVector.size(); i++) {
                 
@@ -88,5 +122,8 @@ namespace visualizerWindows
             ImGui::PopItemWidth();
             ImGui::End();
         }
+        
+        
+
 	}
 }
