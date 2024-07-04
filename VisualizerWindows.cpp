@@ -9,8 +9,9 @@ namespace visualizerWindows
     std::vector<int> randomNumberVector;
     int a = 0;
     int b = 0;
-    std::string sort;
-    int callEveryNFrame = 0;
+    std::string sort = "";
+    
+    bool sorting = false;
 
     void ResetViewport(std::string sortType) {
         sort = sortType;
@@ -34,30 +35,29 @@ namespace visualizerWindows
         }
         
     }
-    void ExecuteBubbleSort() {
-              
-        if (randomNumberVector[a] > randomNumberVector[b]) {
-            std::swap(randomNumberVector[a], randomNumberVector[b]);
-        }
+    bool ExecuteBubbleSort(std::vector<int>& arr, int& i, int& j) {
+                 
         
-        if (a != randomNumberVector.size() - 1) {
-            a++;
-        }
-        else {
-            a = 0;
-            if (b != randomNumberVector.size() - 1) {
-                b++;
-            }
-            else {
-                sort = "";
-            }
-        }
+       if (i < arr.size() - 1) {
+           if (j < arr.size() - i - 1) {
+               if (arr[j] > arr[j + 1]) {
+                   std::swap(arr[j], arr[j + 1]);
+               }
+               ++j;
+           }
+           else {
+               j = 0;
+               ++i;
+           }
+             
+           return true; 
+       }
+       
+       return false; 
         
     }
-    
+      
 	void RenderUI() {
-       
-        
 
         if (randomNumberVector.empty()) {
             PopulateVectorWithRandomNumbers();
@@ -71,13 +71,22 @@ namespace visualizerWindows
                   
             ImGui::Begin("Choose an Algorithm");
             static int clicked = 0;
+
             if (ImGui::Button("Bubble Sort"))
                 clicked++;
             if (clicked & 1)
-            {
-                
+            { 
                 PopulateVectorWithRandomNumbers();
                 ResetViewport("Bubble");
+                clicked = 0;
+            }
+
+            if (ImGui::Button("Insertion Sort"))
+                clicked++;
+            if (clicked & 1)
+            {
+                PopulateVectorWithRandomNumbers();
+                ResetViewport("Insertion"); //TODO
                 clicked = 0;
             }
             ImGui::End();
@@ -105,17 +114,14 @@ namespace visualizerWindows
             const ImU32 red = ImColor(redf);
             const ImU32 yellow = ImColor(yellowf);
 
-
             const float spacing = 4.0f;
             
-            
-
             float x = p.x + 4.0f;
             ImGui::GetWindowSize();
             float y = p.y + ImGui::GetWindowSize().y -26;
             
-            if (sort == "Bubble" /*&& callEveryNFrame == 60*/) {
-                ExecuteBubbleSort();
+            if (sort == "Bubble") {
+              sorting = ExecuteBubbleSort(randomNumberVector,a,b);
             }
              
             for (int i = 0; i < randomNumberVector.size(); i++) {
@@ -131,25 +137,15 @@ namespace visualizerWindows
                     else {
                         draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (randomNumberVector[i] * 2)), white);
                         x += spacing * 1.0f;
-                    }
-                
-                
+                    }    
             }
+            if (!sorting) {
 
-            if (callEveryNFrame == 60) {
-                
-                callEveryNFrame = 0;
+                sort = "";
             }
-            else {
-                callEveryNFrame++;
-            }
-            
-                                        
+                            
             ImGui::PopItemWidth();
             ImGui::End();
         }
-        
-        
-
 	}
 }
