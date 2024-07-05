@@ -3,20 +3,31 @@
 #include <string>
 #include <random>
 #include <ranges>
+#include <chrono>
+
 
 namespace visualizerWindows 
 { 
     std::vector<int> randomNumberVector;
     int a = 0;
     int b = 0;
+    int key = 0;
     std::string sort = "";
     
     bool sorting = false;
+    bool inserting = false;
 
-    void ResetViewport(std::string sortType) {
+    auto start_time = std::chrono::high_resolution_clock::now();
+    auto end_time = std::chrono::high_resolution_clock::now();
+    
+   
+   
+    void ResetViewport(std::string sortType, int aInt, int bInt, int keyInt) {
         sort = sortType;
-        a = 0;
-        b = 0;
+        a = aInt;
+        b = bInt;
+        key = keyInt;
+        
     }
 
     void PopulateVectorWithRandomNumbers() {
@@ -35,6 +46,8 @@ namespace visualizerWindows
         }
         
     }
+    
+
     bool ExecuteBubbleSort(std::vector<int>& arr, int& i, int& j) {
                  
         
@@ -52,9 +65,36 @@ namespace visualizerWindows
              
            return true; 
        }
-       
+       end_time = std::chrono::high_resolution_clock::now();
        return false; 
         
+    }
+    bool ExecuteInsertionSort(std::vector<int>& arr, int& i, int& j, int& key, bool& inserting) {
+       
+        if (i < arr.size()) {
+            if (!inserting) {
+                key = arr[i];
+                j = i - 1;
+                inserting = true;
+            }
+
+            if (j >= 0 && arr[j] > key) {
+                arr[j + 1] = arr[j];
+                j--;
+            }
+            else {
+                arr[j + 1] = key;
+                i++;
+                inserting = false;
+            }
+            return true; 
+        }
+        end_time = std::chrono::high_resolution_clock::now();
+        return false;
+    }
+   
+    float mapIntToFloat(int int_value, int int_max) {
+        return static_cast<float>(int_value) / static_cast<float>(int_max);
     }
       
 	void RenderUI() {
@@ -66,9 +106,7 @@ namespace visualizerWindows
         ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
         //Choose an Algorithm Window
         {
-            
-                         
-                  
+                   
             ImGui::Begin("Choose an Algorithm");
             static int clicked = 0;
 
@@ -77,7 +115,8 @@ namespace visualizerWindows
             if (clicked & 1)
             { 
                 PopulateVectorWithRandomNumbers();
-                ResetViewport("Bubble");
+                ResetViewport("Bubble",0,0,0);
+                start_time = std::chrono::high_resolution_clock::now();
                 clicked = 0;
             }
 
@@ -86,7 +125,8 @@ namespace visualizerWindows
             if (clicked & 1)
             {
                 PopulateVectorWithRandomNumbers();
-                ResetViewport("Insertion"); //TODO
+                ResetViewport("Insertion",1,0,0);
+                start_time = std::chrono::high_resolution_clock::now();
                 clicked = 0;
             }
             ImGui::End();
@@ -103,7 +143,7 @@ namespace visualizerWindows
 
            
             static float sz = 36.0f;
-            static int thickness = 1.0;
+            static int thickness = 1;
             
             static ImVec4 whitef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
             static ImVec4 redf = ImVec4(1.0f, 0, 0, 1.0f);
@@ -117,33 +157,46 @@ namespace visualizerWindows
             const float spacing = 4.0f;
             
             float x = p.x + 4.0f;
-            ImGui::GetWindowSize();
             float y = p.y + ImGui::GetWindowSize().y -26;
-            
-            if (sort == "Bubble") {
-              sorting = ExecuteBubbleSort(randomNumberVector,a,b);
+            if (sort != "") {
+                if (sort == "Bubble") {
+                    sorting = ExecuteBubbleSort(randomNumberVector, a, b);
+                }
+                else if(sort == "Insertion"){
+                    sorting = ExecuteInsertionSort(randomNumberVector, a, b, key, inserting);
+                }
             }
              
             for (int i = 0; i < randomNumberVector.size(); i++) {
                
-                    if (i == a) {
-                        draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (randomNumberVector[i] * 2)), yellow);
-                        x += spacing * 1.0f;
-                    }
-                    else if (i == b) {
+                    
+                    if (i == b) {
                         draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (randomNumberVector[i] * 2)), red);
-                        x += spacing * 1.0f;
+                        
                     }
                     else {
                         draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (randomNumberVector[i] * 2)), white);
-                        x += spacing * 1.0f;
+                        
                     }    
+                    x += spacing * 1.0f;
             }
-            if (!sorting) {
+           
+            //ProgressBar
+            float progress = mapIntToFloat(a, randomNumberVector.size());
 
+            ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
+            ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+            ImGui::Text("Progress Bar");
+            
+            
+
+            if (!sorting) {
+                std::chrono::duration<double> elapsed_time = end_time - start_time;
+                ImGui::Text("Execution Time: %.2fs\n", elapsed_time.count());
                 sort = "";
             }
-                            
+            
+                         
             ImGui::PopItemWidth();
             ImGui::End();
         }
