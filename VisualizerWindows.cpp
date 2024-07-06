@@ -92,6 +92,28 @@ namespace visualizerWindows
         end_time = std::chrono::high_resolution_clock::now();
         return false;
     }
+    bool ExecuteSelectionSort(std::vector<int>& arr, int& i, int& j, int& minIndex) {
+        int n = arr.size();
+        if (i < n - 1) {
+            if (j < n) {
+                if (arr[j] < arr[minIndex]) {
+                    minIndex = j;
+                }
+                ++j;
+            }
+            else {
+                if (minIndex != i) {
+                    std::swap(arr[i], arr[minIndex]);
+                }
+                ++i;
+                j = i + 1;
+                minIndex = i;
+            }
+            return true;
+        }
+        end_time = std::chrono::high_resolution_clock::now();
+        return false;
+    }
    
     float mapIntToFloat(int int_value, int int_max) {
         return static_cast<float>(int_value) / static_cast<float>(int_max);
@@ -126,6 +148,15 @@ namespace visualizerWindows
             {
                 PopulateVectorWithRandomNumbers();
                 ResetViewport("Insertion",1,0,0);
+                start_time = std::chrono::high_resolution_clock::now();
+                clicked = 0;
+            }
+            if (ImGui::Button("Selection Sort"))
+                clicked++;
+            if (clicked & 1)
+            {
+                PopulateVectorWithRandomNumbers();
+                ResetViewport("Selection", 0, 1, 0);
                 start_time = std::chrono::high_resolution_clock::now();
                 clicked = 0;
             }
@@ -165,6 +196,10 @@ namespace visualizerWindows
                 else if(sort == "Insertion"){
                     sorting = ExecuteInsertionSort(randomNumberVector, a, b, key, inserting);
                 }
+                if (sort == "Selection") {
+                    sorting = ExecuteSelectionSort(randomNumberVector, a, b, key);
+                }
+
             }
              
             for (int i = 0; i < randomNumberVector.size(); i++) {
