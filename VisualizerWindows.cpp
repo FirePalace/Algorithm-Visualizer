@@ -4,11 +4,13 @@
 #include <random>
 #include <ranges>
 #include <chrono>
+#include <stack>
 
 
-namespace visualizerWindows 
+
+namespace VisualizerWindows 
 { 
-    std::vector<int> randomNumberVector;
+    std::vector<int> arr;
     int a = 0;
     int b = 0;
     int key = 0;
@@ -19,9 +21,12 @@ namespace visualizerWindows
 
     auto start_time = std::chrono::high_resolution_clock::now();
     auto end_time = std::chrono::high_resolution_clock::now();
-    
+    std::default_random_engine rng(std::chrono::system_clock::now().time_since_epoch().count());
+
    
-   
+
+
+
     void ResetViewport(std::string sortType, int aInt, int bInt, int keyInt) {
         sort = sortType;
         a = aInt;
@@ -34,14 +39,14 @@ namespace visualizerWindows
         std::random_device randomNumbers;
         std::uniform_int_distribution<> distribution(1, 200);
 
-        if (randomNumberVector.empty()) {
+        if (arr.empty()) {
             for (int i = 0; i <= 200; i++) {
-                randomNumberVector.push_back(distribution(randomNumbers));
+                arr.push_back(distribution(randomNumbers));
             }
         }
         else {
             for (int i = 0; i <= 200; i++) {
-                randomNumberVector[i] = distribution(randomNumbers);
+                arr[i] = distribution(randomNumbers);
             }
         }
         
@@ -56,11 +61,11 @@ namespace visualizerWindows
                if (arr[j] > arr[j + 1]) {
                    std::swap(arr[j], arr[j + 1]);
                }
-               ++j;
+               j++;
            }
            else {
                j = 0;
-               ++i;
+               i++;
            }
              
            return true; 
@@ -99,13 +104,13 @@ namespace visualizerWindows
                 if (arr[j] < arr[minIndex]) {
                     minIndex = j;
                 }
-                ++j;
+               j++;
             }
             else {
                 if (minIndex != i) {
                     std::swap(arr[i], arr[minIndex]);
                 }
-                ++i;
+                i++;
                 j = i + 1;
                 minIndex = i;
             }
@@ -114,17 +119,115 @@ namespace visualizerWindows
         end_time = std::chrono::high_resolution_clock::now();
         return false;
     }
-   
+    
     float mapIntToFloat(int int_value, int int_max) {
         return static_cast<float>(int_value) / static_cast<float>(int_max);
+    }
+    
+    void merge(std::vector<int>& arr, int left, int mid, int right) {
+        int n1 = mid - left + 1;
+        int n2 = right - mid;
+
+        std::vector<int> L(n1);
+        std::vector<int> R(n2);
+
+        for (int i = 0; i < n1; i++)
+            L[i] = arr[left + i];
+        for (int i = 0; i < n2; i++)
+            R[i] = arr[mid + 1 + i];
+
+        int i = 0, j = 0, k = left;
+
+        while (i < n1 && j < n2) {
+            if (L[i] <= R[j]) {
+                arr[k] = L[i];
+                i++;
+            }
+            else {
+                arr[k] = R[j];
+                j++;
+            }
+            k++;
+        }
+
+        while (i < n1) {
+            arr[k] = L[i];
+            i++;
+            k++;
+        }
+
+        while (j < n2) {
+            arr[k] = R[j];
+            j++;
+            k++;
+        }
+    }
+
+    
+
+    void mergeSort(std::vector<int>& arr, int left, int right) {
+        if (left < right) {
+            int mid = left + (right - left) / 2;
+
+            mergeSort(arr, left, mid);
+            mergeSort(arr, mid + 1, right);
+
+            merge(arr, left, mid, right);
+        }
+    }
+    
+    
+
+    
+    int partitionQuickSort(std::vector<int>& arr, int low, int high) {
+        int pivot = arr[high]; 
+        int i = (low - 1);     
+
+        for (int j = low; j < high; j++) {
+            
+            if (arr[j] <= pivot) {
+                i++; 
+                std::swap(arr[i], arr[j]);
+            }
+        }
+        std::swap(arr[i + 1], arr[high]);
+        return (i + 1);
+    }
+
+    
+    void quickSort(std::vector<int>& arr, int low, int high) {
+        if (low < high) {
+           
+            int pi = partitionQuickSort(arr, low, high);
+
+            quickSort(arr, low, pi - 1);
+            quickSort(arr, pi + 1, high);
+        }
+    }
+    
+    bool isBogoArraySorted(const std::vector<int>& arr) {
+        for (size_t i = 1; i < arr.size(); ++i) {
+            if (arr[i - 1] > arr[i]) {
+                return false;
+            }
+        }
+        end_time = std::chrono::high_resolution_clock::now();
+        return true;
+    }
+    bool bogoSortStep(std::vector<int>& arr, std::default_random_engine& rng) {
+        if (!isBogoArraySorted(arr)) {
+            std::shuffle(arr.begin(), arr.end(), rng);
+            return true; 
+        }
+        return false; 
     }
       
 	void RenderUI() {
 
-        if (randomNumberVector.empty()) {
+        if (arr.empty()) {
             PopulateVectorWithRandomNumbers();
         }
-       
+ 
         ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
         //Choose an Algorithm Window
         {
@@ -132,34 +235,71 @@ namespace visualizerWindows
             ImGui::Begin("Choose an Algorithm");
             static int clicked = 0;
 
-            if (ImGui::Button("Bubble Sort"))
+            if (ImGui::Button("Bubble Sort")) {
                 clicked++;
-            if (clicked & 1)
-            { 
-                PopulateVectorWithRandomNumbers();
-                ResetViewport("Bubble",0,0,0);
-                start_time = std::chrono::high_resolution_clock::now();
-                clicked = 0;
+                if (clicked & 1)
+                {
+                    PopulateVectorWithRandomNumbers();
+                    ResetViewport("Bubble", 0, 0, 0);
+                    start_time = std::chrono::high_resolution_clock::now();
+                    clicked = 0;
+                }
             }
 
-            if (ImGui::Button("Insertion Sort"))
+            if (ImGui::Button("Insertion Sort")) {
                 clicked++;
-            if (clicked & 1)
-            {
-                PopulateVectorWithRandomNumbers();
-                ResetViewport("Insertion",1,0,0);
-                start_time = std::chrono::high_resolution_clock::now();
-                clicked = 0;
+                if (clicked & 1)
+                {
+                    PopulateVectorWithRandomNumbers();
+                    ResetViewport("Insertion", 1, 0, 0);
+                    start_time = std::chrono::high_resolution_clock::now();
+                    clicked = 0;
+                }
             }
-            if (ImGui::Button("Selection Sort"))
+            if (ImGui::Button("Selection Sort")) {
                 clicked++;
-            if (clicked & 1)
-            {
-                PopulateVectorWithRandomNumbers();
-                ResetViewport("Selection", 0, 1, 0);
-                start_time = std::chrono::high_resolution_clock::now();
-                clicked = 0;
+                if (clicked & 1)
+                {
+                    PopulateVectorWithRandomNumbers();
+                    ResetViewport("Selection", 0, 1, 0);
+                    start_time = std::chrono::high_resolution_clock::now();
+                    clicked = 0;
+                }
             }
+            if (ImGui::Button("Merge Sort")) {
+                clicked++;
+                if (clicked & 1)
+                {
+                    PopulateVectorWithRandomNumbers();
+                    ResetViewport("Merge", 0, 0, 0);
+                    start_time = std::chrono::high_resolution_clock::now();
+                   
+                    clicked = 0;
+                }
+            }
+            if (ImGui::Button("Quick Sort")) {
+                clicked++;
+                if (clicked & 1)
+                {
+                    PopulateVectorWithRandomNumbers();
+                    ResetViewport("Quick", 0, 0, 0);
+                    start_time = std::chrono::high_resolution_clock::now();
+
+                    clicked = 0;
+                }
+            }
+            if (ImGui::Button("Bogo Sort")) {
+                clicked++;
+                if (clicked & 1)
+                {
+                    PopulateVectorWithRandomNumbers();
+                    ResetViewport("Bogo", 0, 0, 0);
+                    start_time = std::chrono::high_resolution_clock::now();
+
+                    clicked = 0;
+                }
+            }
+            
             ImGui::End();
 
         }
@@ -172,7 +312,7 @@ namespace visualizerWindows
 
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
 
-           
+
             static float sz = 36.0f;
             static int thickness = 1;
             
@@ -189,45 +329,66 @@ namespace visualizerWindows
             
             float x = p.x + 4.0f;
             float y = p.y + ImGui::GetWindowSize().y -26;
+            
+            
             if (sort != "") {
                 if (sort == "Bubble") {
-                    sorting = ExecuteBubbleSort(randomNumberVector, a, b);
+                    sorting = ExecuteBubbleSort(arr, a, b);
                 }
                 else if(sort == "Insertion"){
-                    sorting = ExecuteInsertionSort(randomNumberVector, a, b, key, inserting);
+                    sorting = ExecuteInsertionSort(arr, a, b, key, inserting);
                 }
-                if (sort == "Selection") {
-                    sorting = ExecuteSelectionSort(randomNumberVector, a, b, key);
+                else if (sort == "Selection") {
+                    sorting = ExecuteSelectionSort(arr, a, b, key);
+                }
+                else if (sort == "Merge") {
+                    
+                    mergeSort(arr, 0, arr.size() - 1);
+                    sorting = false;
+                    
+                }
+                else if (sort == "Quick") {
+                    quickSort(arr, 0, arr.size() - 1);
+                    sorting = false;
+                }
+                else if (sort == "Bogo") {
+                    sorting = bogoSortStep(arr, rng);
                 }
 
             }
              
-            for (int i = 0; i < randomNumberVector.size(); i++) {
+            for (int i = 0; i < arr.size(); i++) {
                
                     
                     if (i == b) {
-                        draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (randomNumberVector[i] * 2)), red);
+                        draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (arr[i] * 2)), red);
                         
                     }
                     else {
-                        draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (randomNumberVector[i] * 2)), white);
+                        draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (arr[i] * 2)), white);
                         
                     }    
                     x += spacing * 1.0f;
             }
            
             //ProgressBar
-            float progress = mapIntToFloat(a, randomNumberVector.size());
+            if (sort != "Bogo") {
+                float progress = mapIntToFloat(a, arr.size());
 
-            ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
-            ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-            ImGui::Text("Progress Bar");
+                ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
+                ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+                ImGui::Text("Progress Bar");
+            }
             
             
 
             if (!sorting) {
-                std::chrono::duration<double> elapsed_time = end_time - start_time;
-                ImGui::Text("Execution Time: %.2fs\n", elapsed_time.count());
+
+                if (end_time > start_time) {
+                    std::chrono::duration<double> elapsed_time = end_time - start_time;
+                    ImGui::Text("Execution Time: %.2fs\n", elapsed_time.count());
+                }
+
                 sort = "";
             }
             
@@ -236,4 +397,5 @@ namespace visualizerWindows
             ImGui::End();
         }
 	}
+    
 }

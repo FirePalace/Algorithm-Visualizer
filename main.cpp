@@ -52,7 +52,7 @@ int main(int, char**)
 #endif
 
     // Setup window
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window* window = SDL_CreateWindow("Algorithm Visualizer", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
     
     if (window == nullptr)
@@ -156,7 +156,7 @@ int main(int, char**)
         if (show_demo_window)
         ImGui::ShowDemoWindow(&show_demo_window);
 
-        visualizerWindows::RenderUI();
+        VisualizerWindows::RenderUI();
         
 
         // Rendering
@@ -174,7 +174,7 @@ int main(int, char**)
         }
         
 
-        //g_pSwapChain->Present(1, 0); // Present with vsync
+       // g_pSwapChain->Present(1, 0); // Present with vsync
         g_pSwapChain->Present(0, 0); // Present without vsync
     }
 

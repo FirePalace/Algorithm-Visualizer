@@ -1,5 +1,5 @@
 #pragma once
-namespace visualizerWindows
+namespace VisualizerWindows
 {
 	void RenderUI();
 }
