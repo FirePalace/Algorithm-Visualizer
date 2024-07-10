@@ -2,10 +2,11 @@
 #include "imgui.h"
 #include <string>
 #include <random>
-#include <ranges>
 #include <chrono>
 #include <stack>
-
+#include <thread>
+#include <semaphore>
+#include <Windows.h>
 
 
 namespace VisualizerWindows 
@@ -16,23 +17,26 @@ namespace VisualizerWindows
     int key = 0;
     std::string sort = "";
     
+    bool Vsync = true;
     bool sorting = false;
     bool inserting = false;
+    enum class threadSorting {
+        unknown, sorting, sorted
+    };
+    threadSorting sortState = threadSorting::unknown;
 
     auto start_time = std::chrono::high_resolution_clock::now();
     auto end_time = std::chrono::high_resolution_clock::now();
     std::default_random_engine rng(std::chrono::system_clock::now().time_since_epoch().count());
 
-   
-
-
-
+    std::binary_semaphore smphSignalMainToThread{ 0 }, smphSignalThreadToMain{ 0 };
+        
+    std::thread thread;
     void ResetViewport(std::string sortType, int aInt, int bInt, int keyInt) {
         sort = sortType;
         a = aInt;
         b = bInt;
-        key = keyInt;
-        
+        key = keyInt; 
     }
 
     void PopulateVectorWithRandomNumbers() {
@@ -50,12 +54,10 @@ namespace VisualizerWindows
             }
         }
         
-    }
-    
+    }    
 
     bool ExecuteBubbleSort(std::vector<int>& arr, int& i, int& j) {
-                 
-        
+ 
        if (i < arr.size() - 1) {
            if (j < arr.size() - i - 1) {
                if (arr[j] > arr[j + 1]) {
@@ -182,30 +184,49 @@ namespace VisualizerWindows
     int partitionQuickSort(std::vector<int>& arr, int low, int high) {
         int pivot = arr[high]; 
         int i = (low - 1);     
-
+        //smphSignalThreadToMain.release();
         for (int j = low; j < high; j++) {
             
             if (arr[j] <= pivot) {
                 i++; 
+
+                smphSignalMainToThread.acquire();
                 std::swap(arr[i], arr[j]);
+                smphSignalThreadToMain.release();
             }
         }
+
+        smphSignalMainToThread.acquire();
         std::swap(arr[i + 1], arr[high]);
+        smphSignalThreadToMain.release();
+
+        
         return (i + 1);
     }
 
-    
-    void quickSort(std::vector<int>& arr, int low, int high) {
+   
+
+    void internalquickSort(std::vector<int>& arr, int low, int high) {
+          
         if (low < high) {
            
             int pi = partitionQuickSort(arr, low, high);
-
-            quickSort(arr, low, pi - 1);
-            quickSort(arr, pi + 1, high);
+            
+            internalquickSort(arr, low, pi - 1);
+            internalquickSort(arr, pi + 1, high);
         }
+       
+        
+        
+    }
+    void quickSort(std::vector<int>& arr, int low, int high) 
+    {
+        internalquickSort(arr, low, high);
+        OutputDebugStringW(L"Done");
+        sortState = threadSorting::sorted;
     }
     
-    bool isBogoArraySorted(const std::vector<int>& arr) {
+    bool isArraySorted(const std::vector<int>& arr) {
         for (size_t i = 1; i < arr.size(); ++i) {
             if (arr[i - 1] > arr[i]) {
                 return false;
@@ -215,11 +236,50 @@ namespace VisualizerWindows
         return true;
     }
     bool bogoSortStep(std::vector<int>& arr, std::default_random_engine& rng) {
-        if (!isBogoArraySorted(arr)) {
+        if (!isArraySorted(arr)) {
             std::shuffle(arr.begin(), arr.end(), rng);
             return true; 
         }
         return false; 
+    }
+
+    void DrawRectangles() {
+
+        static ImVec4 whitef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        static ImVec4 redf = ImVec4(1.0f, 0, 0, 1.0f);
+      //  static ImVec4 yellowf = ImVec4(1.0f, 1.0f, 0, 1.0f);
+
+        const ImU32 white = ImColor(whitef); 
+       
+        const ImU32 red = ImColor(redf); 
+        // const ImU32 yellow = ImColor(yellowf);
+        ImDrawList* draw_list = ImGui::GetWindowDrawList();
+ 
+        static int thickness = 1;
+      
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+            
+
+        const float spacing = 4.0f;
+            
+            
+        float x = p.x + 4.0f;
+        float y = p.y + ImGui::GetWindowSize().y -26;
+       
+
+        for (int i = 0; i < arr.size(); i++) {
+
+
+            if (i == b) {
+                draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (arr[i] * 2)), red);
+
+            }
+            else {
+                draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (arr[i] * 2)), white);
+
+            }
+            x += spacing * 1.0f;
+        }
     }
       
 	void RenderUI() {
@@ -246,6 +306,16 @@ namespace VisualizerWindows
                 }
             }
 
+            ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+            
+            if (ImGui::Button("Slow")) {
+                clicked++;
+                if (clicked & 1)
+                {
+                    Vsync = true;
+                    clicked = 0;
+                }
+            }
             if (ImGui::Button("Insertion Sort")) {
                 clicked++;
                 if (clicked & 1)
@@ -253,6 +323,16 @@ namespace VisualizerWindows
                     PopulateVectorWithRandomNumbers();
                     ResetViewport("Insertion", 1, 0, 0);
                     start_time = std::chrono::high_resolution_clock::now();
+                    clicked = 0;
+                }
+            }
+            ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+
+            if (ImGui::Button("Fast")) {
+                clicked++;
+                if (clicked & 1)
+                {
+                    Vsync = false;
                     clicked = 0;
                 }
             }
@@ -310,26 +390,6 @@ namespace VisualizerWindows
             ImGui::Begin("Viewport");
             ImGui::PushItemWidth(-ImGui::GetFontSize() * 15);
 
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-
-
-            static float sz = 36.0f;
-            static int thickness = 1;
-            
-            static ImVec4 whitef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-            static ImVec4 redf = ImVec4(1.0f, 0, 0, 1.0f);
-            static ImVec4 yellowf = ImVec4(1.0f, 1.0f, 0, 1.0f);
-           
-            const ImVec2 p = ImGui::GetCursorScreenPos();
-            const ImU32 white = ImColor(whitef);
-            const ImU32 red = ImColor(redf);
-            const ImU32 yellow = ImColor(yellowf);
-
-            const float spacing = 4.0f;
-            
-            float x = p.x + 4.0f;
-            float y = p.y + ImGui::GetWindowSize().y -26;
-            
             
             if (sort != "") {
                 if (sort == "Bubble") {
@@ -348,28 +408,29 @@ namespace VisualizerWindows
                     
                 }
                 else if (sort == "Quick") {
-                    quickSort(arr, 0, arr.size() - 1);
-                    sorting = false;
+                    int n = arr.size() - 1;
+                    
+                    
+                    if (!sorting && sortState == threadSorting::unknown) {
+                        
+                        thread = std::thread(quickSort, std::ref(arr), 0, n);
+                        smphSignalMainToThread.release();
+                        
+                        sortState = threadSorting::sorting;
+                        sorting = true;
+                    }
+              
+                   smphSignalThreadToMain.acquire();
+                   smphSignalMainToThread.release();
                 }
                 else if (sort == "Bogo") {
                     sorting = bogoSortStep(arr, rng);
                 }
 
             }
-             
-            for (int i = 0; i < arr.size(); i++) {
-               
-                    
-                    if (i == b) {
-                        draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (arr[i] * 2)), red);
-                        
-                    }
-                    else {
-                        draw_list->AddRectFilled(ImVec2(x, y), ImVec2(x + thickness, y - (arr[i] * 2)), white);
-                        
-                    }    
-                    x += spacing * 1.0f;
-            }
+      
+            DrawRectangles();
+
            
             //ProgressBar
             if (sort != "Bogo") {
@@ -379,8 +440,6 @@ namespace VisualizerWindows
                 ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
                 ImGui::Text("Progress Bar");
             }
-            
-            
 
             if (!sorting) {
 
@@ -391,10 +450,18 @@ namespace VisualizerWindows
 
                 sort = "";
             }
-            
-                         
+               
             ImGui::PopItemWidth();
             ImGui::End();
+            
+            if (sortState == threadSorting::sorted) {
+                sorting = false;
+                sort = "";
+                sortState = threadSorting::unknown;
+                      
+                thread.join();
+
+            }
         }
 	}
     

@@ -2,4 +2,5 @@
 namespace VisualizerWindows
 {
 	void RenderUI();
+	extern bool Vsync;
 }
