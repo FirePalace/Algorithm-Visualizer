@@ -122,44 +122,59 @@ namespace VisualizerWindows
         return false;
     }
     
-    float mapIntToFloat(int int_value, int int_max) {
+    float MapIntToFloat(int int_value, int int_max) {
         return static_cast<float>(int_value) / static_cast<float>(int_max);
     }
     
-    void merge(std::vector<int>& arr, int left, int mid, int right) {
+    void Merge(std::vector<int>& arr, int left, int mid, int right) {
         int n1 = mid - left + 1;
         int n2 = right - mid;
 
         std::vector<int> L(n1);
         std::vector<int> R(n2);
 
-        for (int i = 0; i < n1; i++)
+        for (int i = 0; i < n1; i++) {
+            smphSignalMainToThread.acquire();
             L[i] = arr[left + i];
-        for (int i = 0; i < n2; i++)
+            smphSignalThreadToMain.release();
+        }
+        for (int i = 0; i < n2; i++) {
+            smphSignalMainToThread.acquire();
             R[i] = arr[mid + 1 + i];
+            smphSignalThreadToMain.release();
+        }
+            
 
         int i = 0, j = 0, k = left;
 
         while (i < n1 && j < n2) {
             if (L[i] <= R[j]) {
+                smphSignalMainToThread.acquire(); 
                 arr[k] = L[i];
+                smphSignalThreadToMain.release();
                 i++;
             }
             else {
+                smphSignalMainToThread.acquire();
                 arr[k] = R[j];
+                smphSignalThreadToMain.release();
                 j++;
             }
             k++;
         }
 
         while (i < n1) {
+            smphSignalMainToThread.acquire();
             arr[k] = L[i];
+            smphSignalThreadToMain.release();
             i++;
             k++;
         }
 
         while (j < n2) {
+            smphSignalMainToThread.acquire();
             arr[k] = R[j];
+            smphSignalThreadToMain.release();
             j++;
             k++;
         }
@@ -167,24 +182,29 @@ namespace VisualizerWindows
 
     
 
-    void mergeSort(std::vector<int>& arr, int left, int right) {
+    void InternalMergeSort(std::vector<int>& arr, int left, int right) {
         if (left < right) {
             int mid = left + (right - left) / 2;
 
-            mergeSort(arr, left, mid);
-            mergeSort(arr, mid + 1, right);
+            InternalMergeSort(arr, left, mid);
+            InternalMergeSort(arr, mid + 1, right);
 
-            merge(arr, left, mid, right);
+            Merge(arr, left, mid, right);
         }
     }
-    
-    
+
+    void ExecuteMergeSort(std::vector<int>& arr, int left, int right) {
+        InternalMergeSort(arr, left,  right);
+       
+        sortState = threadSorting::sorted;
+    }
+     
 
     
-    int partitionQuickSort(std::vector<int>& arr, int low, int high) {
+    int PartitionQuickSort(std::vector<int>& arr, int low, int high) {
         int pivot = arr[high]; 
         int i = (low - 1);     
-        //smphSignalThreadToMain.release();
+        
         for (int j = low; j < high; j++) {
             
             if (arr[j] <= pivot) {
@@ -206,27 +226,27 @@ namespace VisualizerWindows
 
    
 
-    void internalquickSort(std::vector<int>& arr, int low, int high) {
+    void InternalquickSort(std::vector<int>& arr, int low, int high) {
           
         if (low < high) {
            
-            int pi = partitionQuickSort(arr, low, high);
+            int pi = PartitionQuickSort(arr, low, high);
             
-            internalquickSort(arr, low, pi - 1);
-            internalquickSort(arr, pi + 1, high);
+            InternalquickSort(arr, low, pi - 1);
+            InternalquickSort(arr, pi + 1, high);
         }
        
         
         
     }
-    void quickSort(std::vector<int>& arr, int low, int high) 
+    void ExecuteQuickSort(std::vector<int>& arr, int low, int high) 
     {
-        internalquickSort(arr, low, high);
-        OutputDebugStringW(L"Done");
+        InternalquickSort(arr, low, high);
+        
         sortState = threadSorting::sorted;
     }
     
-    bool isArraySorted(const std::vector<int>& arr) {
+    bool IsArraySorted(const std::vector<int>& arr) {
         for (size_t i = 1; i < arr.size(); ++i) {
             if (arr[i - 1] > arr[i]) {
                 return false;
@@ -235,19 +255,57 @@ namespace VisualizerWindows
         end_time = std::chrono::high_resolution_clock::now();
         return true;
     }
-    bool bogoSortStep(std::vector<int>& arr, std::default_random_engine& rng) {
-        if (!isArraySorted(arr)) {
+    bool ExecuteBogoSort(std::vector<int>& arr, std::default_random_engine& rng) {
+        if (!IsArraySorted(arr)) {
             std::shuffle(arr.begin(), arr.end(), rng);
             return true; 
         }
         return false; 
     }
 
+    void Heapify(std::vector<int>& arr, int n, int i) {
+        int largest = i; 
+        int left = 2 * i + 1; 
+        int right = 2 * i + 2; 
+
+        if (left < n && arr[left] > arr[largest])
+            largest = left;
+ 
+        if (right < n && arr[right] > arr[largest])
+            largest = right;
+
+      
+        if (largest != i) {
+            smphSignalMainToThread.acquire();
+            std::swap(arr[i], arr[largest]);
+            smphSignalThreadToMain.release();
+
+            Heapify(arr, n, largest);
+        }
+    }
+
+    
+    void ExecuteHeapSort(std::vector<int>& arr) {
+        int n = arr.size();
+
+        for (int i = n / 2 - 1; i >= 0; i--)
+            Heapify(arr, n, i);
+
+        for (int i = n - 1; i >= 0; i--) {
+            smphSignalMainToThread.acquire();
+            std::swap(arr[0], arr[i]);
+            smphSignalThreadToMain.release(); 
+
+            Heapify(arr, i, 0);
+        }
+        sortState = threadSorting::sorted;
+    }
+
     void DrawRectangles() {
 
         static ImVec4 whitef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
         static ImVec4 redf = ImVec4(1.0f, 0, 0, 1.0f);
-      //  static ImVec4 yellowf = ImVec4(1.0f, 1.0f, 0, 1.0f);
+        // static ImVec4 yellowf = ImVec4(1.0f, 1.0f, 0, 1.0f);
 
         const ImU32 white = ImColor(whitef); 
        
@@ -281,6 +339,11 @@ namespace VisualizerWindows
             x += spacing * 1.0f;
         }
     }
+    void ResetAllSortingAttributes() {
+        sorting = false;
+        sort = "";
+        sortState = threadSorting::unknown;
+    }
       
 	void RenderUI() {
 
@@ -297,7 +360,7 @@ namespace VisualizerWindows
 
             if (ImGui::Button("Bubble Sort")) {
                 clicked++;
-                if (clicked & 1)
+                if (clicked & 1 && sort == "")
                 {
                     PopulateVectorWithRandomNumbers();
                     ResetViewport("Bubble", 0, 0, 0);
@@ -310,7 +373,7 @@ namespace VisualizerWindows
             
             if (ImGui::Button("Slow")) {
                 clicked++;
-                if (clicked & 1)
+                if (clicked & 1 )
                 {
                     Vsync = true;
                     clicked = 0;
@@ -318,7 +381,7 @@ namespace VisualizerWindows
             }
             if (ImGui::Button("Insertion Sort")) {
                 clicked++;
-                if (clicked & 1)
+                if (clicked & 1 && sort == "")
                 {
                     PopulateVectorWithRandomNumbers();
                     ResetViewport("Insertion", 1, 0, 0);
@@ -338,7 +401,7 @@ namespace VisualizerWindows
             }
             if (ImGui::Button("Selection Sort")) {
                 clicked++;
-                if (clicked & 1)
+                if (clicked & 1 && sort == "")
                 {
                     PopulateVectorWithRandomNumbers();
                     ResetViewport("Selection", 0, 1, 0);
@@ -348,7 +411,7 @@ namespace VisualizerWindows
             }
             if (ImGui::Button("Merge Sort")) {
                 clicked++;
-                if (clicked & 1)
+                if (clicked & 1 && sort == "")
                 {
                     PopulateVectorWithRandomNumbers();
                     ResetViewport("Merge", 0, 0, 0);
@@ -359,7 +422,7 @@ namespace VisualizerWindows
             }
             if (ImGui::Button("Quick Sort")) {
                 clicked++;
-                if (clicked & 1)
+                if (clicked & 1 && sort == "")
                 {
                     PopulateVectorWithRandomNumbers();
                     ResetViewport("Quick", 0, 0, 0);
@@ -370,10 +433,21 @@ namespace VisualizerWindows
             }
             if (ImGui::Button("Bogo Sort")) {
                 clicked++;
-                if (clicked & 1)
+                if (clicked & 1 && sort == "")
                 {
                     PopulateVectorWithRandomNumbers();
                     ResetViewport("Bogo", 0, 0, 0);
+                    start_time = std::chrono::high_resolution_clock::now();
+
+                    clicked = 0;
+                }
+            }
+            if (ImGui::Button("Heap Sort")) {
+                clicked++;
+                if (clicked & 1 && sort == "")
+                {
+                    PopulateVectorWithRandomNumbers();
+                    ResetViewport("Heap", 0, 0, 0);
                     start_time = std::chrono::high_resolution_clock::now();
 
                     clicked = 0;
@@ -402,10 +476,21 @@ namespace VisualizerWindows
                     sorting = ExecuteSelectionSort(arr, a, b, key);
                 }
                 else if (sort == "Merge") {
+                    int n = arr.size() - 1;
+
+                   if (!sorting && sortState == threadSorting::unknown) {
+
+                       thread = std::thread(ExecuteMergeSort, std::ref(arr), 0, n);
+                       smphSignalMainToThread.release();
+
+                       sortState = threadSorting::sorting;
+                       sorting = true;
+                    }
+
+                    smphSignalThreadToMain.acquire();
+                    smphSignalMainToThread.release();
                     
-                    mergeSort(arr, 0, arr.size() - 1);
-                    sorting = false;
-                    
+
                 }
                 else if (sort == "Quick") {
                     int n = arr.size() - 1;
@@ -413,7 +498,7 @@ namespace VisualizerWindows
                     
                     if (!sorting && sortState == threadSorting::unknown) {
                         
-                        thread = std::thread(quickSort, std::ref(arr), 0, n);
+                        thread = std::thread(ExecuteQuickSort, std::ref(arr), 0, n);
                         smphSignalMainToThread.release();
                         
                         sortState = threadSorting::sorting;
@@ -424,8 +509,25 @@ namespace VisualizerWindows
                    smphSignalMainToThread.release();
                 }
                 else if (sort == "Bogo") {
-                    sorting = bogoSortStep(arr, rng);
+                    sorting = ExecuteBogoSort(arr, rng);
                 }
+                else if (sort == "Heap") {
+                    
+                    int n = arr.size() - 1;
+
+                    if (!sorting && sortState == threadSorting::unknown) {
+
+                        thread = std::thread(ExecuteHeapSort, std::ref(arr));
+                        smphSignalMainToThread.release();
+
+                        sortState = threadSorting::sorting;
+                        sorting = true;
+                    }
+
+                    smphSignalThreadToMain.acquire();
+                    smphSignalMainToThread.release();
+                }
+                
 
             }
       
@@ -434,11 +536,23 @@ namespace VisualizerWindows
            
             //ProgressBar
             if (sort != "Bogo") {
-                float progress = mapIntToFloat(a, arr.size());
+                float progress = MapIntToFloat(a, arr.size());
 
                 ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
                 ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
                 ImGui::Text("Progress Bar");
+            }
+            else {
+                //Panicbutton if you want to exit Bogo Sort
+                static int clicked = 0;
+                if (ImGui::Button("Stop this Madness")) {
+                    clicked++;
+                    if (clicked & 1)
+                    {
+                        ResetAllSortingAttributes();
+                        clicked = 0;
+                    }
+                }
             }
 
             if (!sorting) {
@@ -455,10 +569,8 @@ namespace VisualizerWindows
             ImGui::End();
             
             if (sortState == threadSorting::sorted) {
-                sorting = false;
-                sort = "";
-                sortState = threadSorting::unknown;
-                      
+                
+                ResetAllSortingAttributes();
                 thread.join();
 
             }
