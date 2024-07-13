@@ -16,7 +16,7 @@
 #include <SDL_syswm.h>
 #include "VisualizerWindows.h"
 
-
+using threadSorting = VisualizerWindows::threadSorting;
 
 // Data
 static ID3D11Device* g_pd3dDevice = nullptr;
@@ -179,9 +179,13 @@ int main(int, char**)
         while (SDL_PollEvent(&event))
         {
             ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT)
+            if (event.type == SDL_QUIT && VisualizerWindows::sortState != threadSorting::sorting) {
+                
                 done = true;
-            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
+            }
+                
+            if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window) 
+                && VisualizerWindows::sortState != threadSorting::sorting)
                 done = true;
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_RESIZED && event.window.windowID == SDL_GetWindowID(window))
             {
