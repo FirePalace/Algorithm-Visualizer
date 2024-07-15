@@ -313,6 +313,49 @@ namespace VisualizerWindows
 		}
 		sortState = threadSorting::sorted;
 	}
+	
+
+	void CountingRadixSort(std::vector<int>& arr, int exp) {
+		int n = arr.size();
+		std::vector<int> output(n);
+		int count[10] = { 0 };
+
+		for (int i = 0; i < n; i++) {
+			smphSignalMainToThread.acquire();
+			count[(arr[i] / exp) % 10]++;
+			smphSignalThreadToMain.release();
+		}
+
+		for (int i = 1; i < 10; i++) {
+			smphSignalMainToThread.acquire();
+			count[i] += count[i - 1];
+			smphSignalThreadToMain.release();
+		}
+
+		for (int i = n - 1; i >= 0; i--) {
+			smphSignalMainToThread.acquire();	
+			output[count[(arr[i] / exp) % 10] - 1] = arr[i];
+			smphSignalThreadToMain.release();
+			count[(arr[i] / exp) % 10]--;
+		}
+
+		for (int i = 0; i < n; i++)
+		{
+			smphSignalMainToThread.acquire();
+			arr[i] = output[i];
+			smphSignalThreadToMain.release();
+		}
+			
+	}
+
+	void ExecuteRadixSort(std::vector<int>& arr) {
+		int m = *std::max_element(arr.begin(), arr.end());
+
+		for (int exp = 1; m / exp > 0; exp *= 10) {
+			CountingRadixSort(arr, exp);
+		}
+		sortState = threadSorting::sorted;
+	}
 	void DrawRectangles() {
 		static ImVec4 whitef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 		static ImVec4 redf = ImVec4(1.0f, 0, 0, 1.0f);
@@ -466,6 +509,16 @@ namespace VisualizerWindows
 					clicked = 0;
 				}
 			}
+			if (ImGui::Button("Radix Sort")) {
+				clicked++;
+				if (clicked & 1 && sort == "")
+				{
+					PopulateVectorWithRandomNumbers();
+					ResetViewport("Radix", 0, 0, 0);
+					start_time = std::chrono::high_resolution_clock::now();
+					clicked = 0;
+				}
+			}
 
 			ImGui::End();
 		}
@@ -535,6 +588,20 @@ namespace VisualizerWindows
 
 					if (!sorting && sortState == threadSorting::unknown) {
 						thread = std::thread(ExecuteCountingSort, std::ref(arr));
+						smphSignalMainToThread.release();
+
+						sortState = threadSorting::sorting;
+						sorting = true;
+					}
+
+					smphSignalThreadToMain.acquire();
+					smphSignalMainToThread.release();
+				}
+				else if (sort == "Radix") {
+					int n = arr.size() - 1;
+
+					if (!sorting && sortState == threadSorting::unknown) {
+						thread = std::thread(ExecuteRadixSort, std::ref(arr));
 						smphSignalMainToThread.release();
 
 						sortState = threadSorting::sorting;
