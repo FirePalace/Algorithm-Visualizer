@@ -313,7 +313,6 @@ namespace VisualizerWindows
 		}
 		sortState = threadSorting::sorted;
 	}
-	
 
 	void CountingRadixSort(std::vector<int>& arr, int exp) {
 		int n = arr.size();
@@ -333,7 +332,7 @@ namespace VisualizerWindows
 		}
 
 		for (int i = n - 1; i >= 0; i--) {
-			smphSignalMainToThread.acquire();	
+			smphSignalMainToThread.acquire();
 			output[count[(arr[i] / exp) % 10] - 1] = arr[i];
 			smphSignalThreadToMain.release();
 			count[(arr[i] / exp) % 10]--;
@@ -345,7 +344,6 @@ namespace VisualizerWindows
 			arr[i] = output[i];
 			smphSignalThreadToMain.release();
 		}
-			
 	}
 
 	void ExecuteRadixSort(std::vector<int>& arr) {
@@ -356,6 +354,43 @@ namespace VisualizerWindows
 		}
 		sortState = threadSorting::sorted;
 	}
+
+	void ExecuteCocktailSort(std::vector<int>& arr) {
+		bool swapped = true;
+		int start = 0;
+		int end = arr.size() - 1;
+
+		while (swapped) {
+			swapped = false;
+
+			for (int i = start; i < end; ++i) {
+				if (arr[i] > arr[i + 1]) {
+					smphSignalMainToThread.acquire();
+					std::swap(arr[i], arr[i + 1]);
+					smphSignalThreadToMain.release();
+					swapped = true;
+				}
+			}
+
+			if (!swapped)
+				break;
+
+			swapped = false;
+			--end;
+
+			for (int i = end - 1; i >= start; --i) {
+				if (arr[i] > arr[i + 1]) {
+					smphSignalMainToThread.acquire();
+					std::swap(arr[i], arr[i + 1]);
+					smphSignalThreadToMain.release();
+					swapped = true;
+				}
+			}
+			++start;
+		}
+		sortState = threadSorting::sorted;
+	}
+
 	void DrawRectangles() {
 		static ImVec4 whitef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 		static ImVec4 redf = ImVec4(1.0f, 0, 0, 1.0f);
@@ -519,6 +554,16 @@ namespace VisualizerWindows
 					clicked = 0;
 				}
 			}
+			if (ImGui::Button("Cocktail Sort")) {
+				clicked++;
+				if (clicked & 1 && sort == "")
+				{
+					PopulateVectorWithRandomNumbers();
+					ResetViewport("Cocktail", 0, 0, 0);
+					start_time = std::chrono::high_resolution_clock::now();
+					clicked = 0;
+				}
+			}
 
 			ImGui::End();
 		}
@@ -602,6 +647,20 @@ namespace VisualizerWindows
 
 					if (!sorting && sortState == threadSorting::unknown) {
 						thread = std::thread(ExecuteRadixSort, std::ref(arr));
+						smphSignalMainToThread.release();
+
+						sortState = threadSorting::sorting;
+						sorting = true;
+					}
+
+					smphSignalThreadToMain.acquire();
+					smphSignalMainToThread.release();
+				}
+				else if (sort == "Cocktail") {
+					int n = arr.size() - 1;
+
+					if (!sorting && sortState == threadSorting::unknown) {
+						thread = std::thread(ExecuteCocktailSort, std::ref(arr));
 						smphSignalMainToThread.release();
 
 						sortState = threadSorting::sorting;
