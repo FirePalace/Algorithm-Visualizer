@@ -7,18 +7,24 @@
 #include <thread>
 #include <semaphore>
 #include <Windows.h>
+#include <algorithm>
 
 namespace VisualizerWindows
 {
+	using namespace std::literals;
 	std::vector<int> arr;
+	std::vector<double> elapsedTimeArr;
+	std::vector<std::string> sortingArr;
 	int a = 0;
 	int b = 0;
 	int key = 0;
+	int sortCount = 0;
 	std::string sort = "";
 
-	bool Vsync = true;
+	bool Vsync = false;
 	bool sorting = false;
 	bool inserting = false;
+	bool pushTime = true;
 
 	threadSorting sortState = threadSorting::unknown;
 
@@ -32,9 +38,12 @@ namespace VisualizerWindows
 
 	void ResetViewport(std::string sortType, int aInt, int bInt, int keyInt) {
 		sort = sortType;
+		sortingArr.push_back(sortType);
 		a = aInt;
 		b = bInt;
 		key = keyInt;
+		sortCount++;
+		pushTime = true;
 	}
 
 	void PopulateVectorWithRandomNumbers() {
@@ -69,6 +78,7 @@ namespace VisualizerWindows
 			return true;
 		}
 		end_time = std::chrono::high_resolution_clock::now();
+
 		return false;
 	}
 	bool ExecuteInsertionSort(std::vector<int>& arr, int& i, int& j, int& key, bool& inserting) {
@@ -91,6 +101,7 @@ namespace VisualizerWindows
 			return true;
 		}
 		end_time = std::chrono::high_resolution_clock::now();
+
 		return false;
 	}
 	bool ExecuteSelectionSort(std::vector<int>& arr, int& i, int& j, int& minIndex) {
@@ -113,6 +124,7 @@ namespace VisualizerWindows
 			return true;
 		}
 		end_time = std::chrono::high_resolution_clock::now();
+
 		return false;
 	}
 
@@ -391,6 +403,35 @@ namespace VisualizerWindows
 		sortState = threadSorting::sorted;
 	}
 
+	void ExecuteBingoSort(std::vector<int>& arr)
+	{
+		std::vector<int> minArr;
+		int i = 0;
+		while (i < arr.size()) {
+			int min = arr[i];
+			minArr.clear();
+
+			for (int j = i; j < arr.size(); j++) {
+				if (arr[j] == min) {
+					minArr.push_back(j);
+				}
+				if (arr[j] < min) {
+					minArr.clear();
+					minArr.push_back(j);
+					min = arr[j];
+				}
+			}
+			for (int k = 0; k < minArr.size(); k++) {
+				smphSignalMainToThread.acquire();
+				std::swap(arr[i], arr[minArr[k]]);
+				smphSignalThreadToMain.release();
+				i++;
+			}
+		}
+
+		sortState = threadSorting::sorted;
+	}
+
 	void DrawRectangles() {
 		static ImVec4 whitef = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 		static ImVec4 redf = ImVec4(1.0f, 0, 0, 1.0f);
@@ -420,6 +461,10 @@ namespace VisualizerWindows
 			}
 			x += spacing * 1.0f;
 		}
+	}
+	const char* const BoolToString(bool b)
+	{
+		return b ? "true" : "false";
 	}
 	void ResetAllSortingAttributes() {
 		sorting = false;
@@ -564,6 +609,27 @@ namespace VisualizerWindows
 					clicked = 0;
 				}
 			}
+			if (ImGui::Button("Bingo Sort")) {
+				clicked++;
+				if (clicked & 1 && sort == "")
+				{
+					PopulateVectorWithRandomNumbers();
+					ResetViewport("Bingo", 0, 0, 0);
+					start_time = std::chrono::high_resolution_clock::now();
+					clicked = 0;
+				}
+			}
+
+			auto tempArr = elapsedTimeArr;
+			for (int i=0; i < tempArr.size(); i++) {
+			
+				ImGui::Text("Execution Time: %.2fs, Algorithm: %s\n", tempArr[i], sortingArr[i].c_str());
+				
+			}
+			for (int y = 0; y < tempArr.size(); y++)
+				{
+					tempArr.pop_back();
+				}
 
 			ImGui::End();
 		}
@@ -670,19 +736,27 @@ namespace VisualizerWindows
 					smphSignalThreadToMain.acquire();
 					smphSignalMainToThread.release();
 				}
+				else if (sort == "Bingo") {
+					int n = arr.size();
+
+					if (!sorting && sortState == threadSorting::unknown) {
+						thread = std::thread(ExecuteBingoSort, std::ref(arr));
+						smphSignalMainToThread.release();
+
+						sortState = threadSorting::sorting;
+						sorting = true;
+					}
+
+					smphSignalThreadToMain.acquire();
+					smphSignalMainToThread.release();
+				}
 			}
 
 			DrawRectangles();
 
 			//ProgressBar
-			if (sort != "Bogo") {
-				float progress = MapIntToFloat(a, arr.size());
-
-				ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
-				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-				ImGui::Text("Progress Bar");
-			}
-			else {
+			if (sort == "Bogo")
+			{
 				//Panicbutton if you want to exit Bogo Sort
 				static int clicked = 0;
 				if (ImGui::Button("Stop this Madness")) {
@@ -695,17 +769,25 @@ namespace VisualizerWindows
 				}
 			}
 
+			if (sortState == threadSorting::sorted) {
+				ResetAllSortingAttributes();
+				thread.join();
+			}
 			if (!sorting) {
-				if (end_time > start_time) {
+				const std::chrono::time_point<std::chrono::system_clock> now =
+					std::chrono::system_clock::now();
+
+				if (end_time > start_time + std::chrono::milliseconds(100)) {
 					std::chrono::duration<double> elapsed_time = end_time - start_time;
+					if (pushTime) {
+						elapsedTimeArr.push_back(elapsed_time.count());
+						pushTime = false;
+					}
+
 					ImGui::Text("Execution Time: %.2fs\n", elapsed_time.count());
 				}
 
 				sort = "";
-			}
-			if (sortState == threadSorting::sorted) {
-				ResetAllSortingAttributes();
-				thread.join();
 			}
 			ImGui::PopItemWidth();
 			ImGui::End();
