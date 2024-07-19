@@ -25,6 +25,7 @@ namespace VisualizerWindows
 	bool sorting = false;
 	bool inserting = false;
 	bool pushTime = true;
+	bool showQuitPopup = false;
 
 	threadSorting sortState = threadSorting::unknown;
 
@@ -462,10 +463,7 @@ namespace VisualizerWindows
 			x += spacing * 1.0f;
 		}
 	}
-	const char* const BoolToString(bool b)
-	{
-		return b ? "true" : "false";
-	}
+	
 	void ResetAllSortingAttributes() {
 		sorting = false;
 		sort = "";
@@ -619,21 +617,17 @@ namespace VisualizerWindows
 					clicked = 0;
 				}
 			}
-
-			auto tempArr = elapsedTimeArr;
-			for (int i=0; i < tempArr.size(); i++) {
-			
-				ImGui::Text("Execution Time: %.2fs, Algorithm: %s\n", tempArr[i], sortingArr[i].c_str());
-				
+		}
+		ImGui::End();
+		
+		//Log Window
+		{
+			ImGui::Begin("Log");
+			for (int i = 0; i < elapsedTimeArr.size(); i++) {
+				ImGui::Text("Execution Time: %.2fs, Algorithm: %s Sort", elapsedTimeArr[i], sortingArr[i].c_str());
 			}
-			for (int y = 0; y < tempArr.size(); y++)
-				{
-					tempArr.pop_back();
-				}
-
 			ImGui::End();
 		}
-
 		//Viewport Window
 		{
 			ImGui::Begin("Viewport");
@@ -754,7 +748,17 @@ namespace VisualizerWindows
 
 			DrawRectangles();
 
-			//ProgressBar
+			if (showQuitPopup) {
+				ImGui::OpenPopup("FailedToQuitPopup");
+				showQuitPopup = false;
+				}
+				if (ImGui::BeginPopup("FailedToQuitPopup", ImGuiWindowFlags_MenuBar)) {
+
+				ImGui::Text("Please do not exit the program while an algorithm is still running!");
+				ImGui::EndPopup();
+			}
+				
+		
 			if (sort == "Bogo")
 			{
 				//Panicbutton if you want to exit Bogo Sort
@@ -777,7 +781,7 @@ namespace VisualizerWindows
 				const std::chrono::time_point<std::chrono::system_clock> now =
 					std::chrono::system_clock::now();
 
-				if (end_time > start_time + std::chrono::milliseconds(100)) {
+				if (end_time > start_time + std::chrono::milliseconds(10)) {
 					std::chrono::duration<double> elapsed_time = end_time - start_time;
 					if (pushTime) {
 						elapsedTimeArr.push_back(elapsed_time.count());
